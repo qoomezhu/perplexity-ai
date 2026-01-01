@@ -177,6 +177,16 @@ class TestSearchMode:
                 if "answer" in tool_result.get("data", {}):
                     answer_preview = tool_result["data"]["answer"][:200] + "..."
                     print(f"console.log -> 回答预览: {answer_preview}")
+                # 验证 sources 字段存在
+                assert "sources" in tool_result.get("data", {}), "返回结果缺少 sources 字段"
+                sources = tool_result["data"]["sources"]
+                assert isinstance(sources, list), "sources 应该是一个列表"
+                print(f"console.log -> 来源数量: {len(sources)}")
+                if sources:
+                    # 验证第一个来源的结构
+                    first_source = sources[0]
+                    assert "url" in first_source, "来源缺少 url 字段"
+                    print(f"console.log -> 第一个来源: {first_source.get('title', 'N/A')} - {first_source['url']}")
             else:
                 # 记录错误信息
                 error_msg = tool_result.get("message", "未知错误")
@@ -231,6 +241,16 @@ class TestResearchMode:
                 if "answer" in tool_result.get("data", {}):
                     answer_preview = tool_result["data"]["answer"][:200] + "..."
                     print(f"console.log -> 回答预览: {answer_preview}")
+                # 验证 sources 字段存在
+                assert "sources" in tool_result.get("data", {}), "返回结果缺少 sources 字段"
+                sources = tool_result["data"]["sources"]
+                assert isinstance(sources, list), "sources 应该是一个列表"
+                print(f"console.log -> 来源数量: {len(sources)}")
+                if sources:
+                    # 验证第一个来源的结构
+                    first_source = sources[0]
+                    assert "url" in first_source, "来源缺少 url 字段"
+                    print(f"console.log -> 第一个来源: {first_source.get('title', 'N/A')} - {first_source['url']}")
             else:
                 # 记录错误信息
                 error_msg = tool_result.get("message", "未知错误")

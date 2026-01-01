@@ -103,13 +103,45 @@ def list_models_tool() -> Dict[str, Any]:
 
 
 def _extract_clean_result(response: Dict[str, Any]) -> Dict[str, Any]:
-    """Extract only the final answer from the search response."""
+    """Extract the final answer and source links from the search response."""
     result = {}
-    
-    # 只提取最终答案
+
+    # 提取最终答案
     if "answer" in response:
         result["answer"] = response["answer"]
-    
+
+    # 提取来源链接
+    sources = []
+
+    # 方法1: 从 text 字段的 SEARCH_RESULTS 步骤中提取 web_results
+    if "text" in response and isinstance(response["text"], list):
+        for step in response["text"]:
+            if isinstance(step, dict) and step.get("step_type") == "SEARCH_RESULTS":
+                content = step.get("content", {})
+                web_results = content.get("web_results", [])
+                for web_result in web_results:
+                    if isinstance(web_result, dict) and "url" in web_result:
+                        source = {"url": web_result["url"]}
+                        if "name" in web_result:
+                            source["title"] = web_result["name"]
+                        sources.append(source)
+
+    # 方法2: 备用 - 从 chunks 字段提取（如果 chunks 包含 URL）
+    if not sources and "chunks" in response and isinstance(response["chunks"], list):
+        for chunk in response["chunks"]:
+            if isinstance(chunk, dict):
+                source = {}
+                if "url" in chunk:
+                    source["url"] = chunk["url"]
+                if "title" in chunk:
+                    source["title"] = chunk["title"]
+                if "name" in chunk and "title" not in source:
+                    source["title"] = chunk["name"]
+                if "url" in source:
+                    sources.append(source)
+
+    result["sources"] = sources
+
     return result
 
 
@@ -207,7 +239,7 @@ def search(
         files: 上传文件 (用于分析文档内容)
 
     Returns:
-        {"status": "ok", "data": {"answer": "搜索结果..."}}
+        {"status": "ok", "data": {"answer": "搜索结果...", "sources": [{"title": "...", "url": "..."}]}}
         或 {"status": "error", "error_type": "...", "message": "..."}
     """
     # 限制 search 只能使用 auto 或 pro 模式
@@ -251,7 +283,7 @@ def research(
         files: 上传文件 (用于分析文档内容)
 
     Returns:
-        {"status": "ok", "data": {"answer": "研究结果..."}}
+        {"status": "ok", "data": {"answer": "研究结果...", "sources": [{"title": "...", "url": "..."}]}}
         或 {"status": "error", "error_type": "...", "message": "..."}
     """
     # 限制 research 只能使用 reasoning 或 deep research 模式
