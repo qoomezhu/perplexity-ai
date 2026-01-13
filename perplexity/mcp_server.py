@@ -7,7 +7,7 @@ Supports multi-token pool with load balancing and dynamic management.
 import argparse
 import asyncio
 import os
-from typing import Any, Dict, Iterable, List, Literal, Optional, Union
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
@@ -419,91 +419,6 @@ async def research(
         mode = "reasoning"
     # 使用 asyncio.to_thread 避免阻塞事件循环
     return await asyncio.to_thread(_run_query, query, mode, model, sources, language, incognito, files)
-
-
-@mcp.tool
-async def pool_manage(
-    action: Literal["list", "add", "remove", "info", "enable", "disable", "reset", "status"],
-    id: Optional[str] = None,
-    csrf_token: Optional[str] = None,
-    session_token: Optional[str] = None,
-) -> Dict[str, Any]:
-    """
-    号池管理工具 - 用于动态管理 token 池
-
-    Args:
-        action: 操作类型
-            - 'list': 列举所有 token（返回 id、可用状态和权重）
-            - 'add': 新增 token 到池中
-            - 'remove': 从池中删除指定 token
-            - 'info': 获取用户会话信息（如指定 id 则获取单个，否则获取全部）
-            - 'enable': 启用指定 token
-            - 'disable': 禁用指定 token
-            - 'reset': 重置指定 token 的失败状态和权重
-            - 'status': 获取号池详细状态
-        id: token 标识（add/remove/enable/disable/reset 操作必需，info 操作可选）
-        csrf_token: CSRF token（add 操作必需）
-        session_token: Session token（add 操作必需）
-
-    Returns:
-        list 操作: {"status": "ok", "data": {"clients": [{"id": "...", "available": true, "weight": 100}, ...]}}
-        add 操作: {"status": "ok", "message": "Client 'xxx' added successfully"}
-        remove 操作: {"status": "ok", "message": "Client 'xxx' removed successfully"}
-        info 操作: {"status": "ok", "data": {...用户会话信息...}}
-        enable/disable/reset 操作: {"status": "ok", "message": "..."}
-        status 操作: {"status": "ok", "data": {...详细状态...}}
-        错误: {"status": "error", "message": "..."}
-    """
-    pool = _get_pool()
-
-    if action == "list":
-        return pool.list_clients()
-
-    elif action == "add":
-        if not all([id, csrf_token, session_token]):
-            return {
-                "status": "error",
-                "message": "Missing required parameters: id, csrf_token, session_token",
-            }
-        return pool.add_client(id, csrf_token, session_token)
-
-    elif action == "remove":
-        if not id:
-            return {
-                "status": "error",
-                "message": "Missing required parameter: id",
-            }
-        return pool.remove_client(id)
-
-    elif action == "info":
-        # info 操作会发起网络请求获取用户信息，使用 to_thread 避免阻塞
-        if id:
-            return await asyncio.to_thread(pool.get_client_user_info, id)
-        return await asyncio.to_thread(pool.get_all_clients_user_info)
-
-    elif action == "enable":
-        if not id:
-            return {"status": "error", "message": "Missing required parameter: id"}
-        return pool.enable_client(id)
-
-    elif action == "disable":
-        if not id:
-            return {"status": "error", "message": "Missing required parameter: id"}
-        return pool.disable_client(id)
-
-    elif action == "reset":
-        if not id:
-            return {"status": "error", "message": "Missing required parameter: id"}
-        return pool.reset_client(id)
-
-    elif action == "status":
-        return {"status": "ok", "data": pool.get_status()}
-
-    else:
-        return {
-            "status": "error",
-            "message": f"Invalid action: {action}. Valid actions are: list, add, remove, info, enable, disable, reset, status",
-        }
 
 
 def run_server(
