@@ -168,7 +168,6 @@ PPLX_ADMIN_TOKEN=your-admin-token
 
 ## OpenAI 兼容端点
 
-本服务提供 OpenAI 兼容的 API 端点，可直接对接支持 OpenAI API 的客户端（如 ChatBox、OpenCat、Cursor 等）。
 
 ### 使用方式
 
