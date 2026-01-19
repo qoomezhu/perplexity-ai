@@ -254,8 +254,36 @@ perplexity/
 │   ├── admin.py             # 管理端点 (健康检查、号池管理、心跳控制)
 │   ├── utils.py             # 服务器专用工具函数 (验证、OAI模型映射)
 │   ├── client_pool.py       # 多账户连接池管理
-│   └── web/
-│       └── admin.html       # 号池管理 Web UI
+│   └── web/                 # 前端 Web UI (React + Vite)
+│       ├── src/
+│       │   ├── components/
+│       │   │   ├── ui/      # 通用 UI 组件 (BrutalistCard, Modal, Toast)
+│       │   │   ├── playground/  # Playground 页面组件
+│       │   │   │   ├── ChatContainer.tsx   # 聊天容器
+│       │   │   │   ├── ChatInput.tsx       # 聊天输入框
+│       │   │   │   ├── ChatMessage.tsx     # 消息展示
+│       │   │   │   ├── ModelSelector.tsx   # 模型选择器
+│       │   │   │   ├── CustomSelect.tsx    # 自定义下拉组件
+│       │   │   │   └── TokenInput.tsx      # Token 输入
+│       │   │   ├── App.tsx          # 应用根组件
+│       │   │   ├── Layout.tsx       # 页面布局
+│       │   │   ├── AuthBar.tsx      # 认证栏
+│       │   │   ├── StatsGrid.tsx    # 统计面板
+│       │   │   ├── TokenTable.tsx   # Token 列表
+│       │   │   ├── HeartbeatPanel.tsx   # 心跳控制
+│       │   │   ├── AddTokenModal.tsx    # 添加 Token 弹窗
+│       │   │   └── ConfirmModal.tsx     # 确认弹窗
+│       │   ├── hooks/       # React Hooks
+│       │   │   ├── useAuth.ts   # 认证状态管理
+│       │   │   ├── usePool.ts   # 号池数据管理
+│       │   │   ├── useChat.ts   # 聊天状态管理
+│       │   │   └── useToast.ts  # Toast 通知
+│       │   ├── lib/
+│       │   │   └── api.ts   # API 请求封装
+│       │   ├── pages/
+│       │   │   └── Playground.tsx  # Playground 页面
+│       │   └── index.tsx    # 入口文件
+│       └── vite.config.ts   # Vite 配置
 ├── client.py                # Perplexity API 客户端
 ├── config.py                # 配置常量
 ├── exceptions.py            # 自定义异常
