@@ -7,6 +7,7 @@ https://github.com/helallao/perplexity-ai
 
 
 ## 更新记录
++ 2026-01-19：增加SKILL，`.claude/skills/perplexity-search`
 + 2026-01-16: 重构项目结构，增加oai 端点适配
 + 2026-01-13: 新增心跳检测功能，支持定时检测token健康状态并通过Telegram通知
 + 2026-01-03: webui控制
