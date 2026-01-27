@@ -5,8 +5,8 @@
   ],
   "functions": {
     "api/index.py": {
-      "maxDuration": 60,
-      "excludeFiles": "{.git/**,tests/**,**/__pycache__/**,*.pyc,*.pyo,*.log,uv.lock,images/**,docs/**,examples/**}"
+      "maxDuration": 300,
+      "excludeFiles": "{.git/**,tests/**,**/__pycache__/**,*.pyc,*.pyo,*.log,uv.lock,images/**,docs/**,examples/**,perplexity/server/web/**}"
     }
   }
 }
