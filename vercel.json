@@ -6,6 +6,7 @@
   "functions": {
     "api/index.py": {
       "maxDuration": 300,
+      "memory": 1024,
       "excludeFiles": "{.git/**,tests/**,**/__pycache__/**,*.pyc,*.pyo,*.log,uv.lock,images/**,docs/**,examples/**,perplexity/server/web/**}"
     }
   }

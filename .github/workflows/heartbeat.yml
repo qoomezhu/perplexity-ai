@@ -1,0 +1,98 @@
+# Token 心跳保活 - 定时触发心跳检测保持 Token 活跃
+# 适用于 Vercel Serverless 部署场景
+#
+# 使用前需要在仓库 Settings > Secrets and variables > Actions 中配置：
+# - VERCEL_URL: 你的 Vercel 部署地址 (如: https://your-app.vercel.app)
+# - PPLX_ADMIN_TOKEN: 管理员 Token (与 Vercel 环境变量中的 PPLX_ADMIN_TOKEN 一致)
+
+name: Token Heartbeat
+
+on:
+  schedule:
+    # 每 4 小时执行一次心跳检测
+    - cron: '0 */4 * * *'
+  workflow_dispatch:
+    # 支持手动触发
+    inputs:
+      test_single:
+        description: '测试单个 Token ID (留空测试全部)'
+        required: false
+        default: ''
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: Check required secrets
+        run: |
+          if [ -z "${{ secrets.VERCEL_URL }}" ]; then
+            echo "::error::Missing VERCEL_URL secret"
+            exit 1
+          fi
+          if [ -z "${{ secrets.PPLX_ADMIN_TOKEN }}" ]; then
+            echo "::error::Missing PPLX_ADMIN_TOKEN secret"
+            exit 1
+          fi
+          echo "✅ All required secrets are configured"
+
+      - name: Health check
+        run: |
+          echo "🔍 Checking service health..."
+          response=$(curl -s -w "\n%{http_code}" "${{ secrets.VERCEL_URL }}/health")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n -1)
+          
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Health check failed with status $http_code"
+            echo "Response: $body"
+            exit 1
+          fi
+          echo "✅ Service is healthy"
+          echo "$body" | jq . 2>/dev/null || echo "$body"
+
+      - name: Trigger heartbeat test
+        run: |
+          echo "💓 Triggering heartbeat test..."
+          
+          # 构建请求体
+          if [ -n "${{ github.event.inputs.test_single }}" ]; then
+            body='{"id": "${{ github.event.inputs.test_single }}"}'
+            echo "Testing single token: ${{ github.event.inputs.test_single }}"
+          else
+            body='{}'
+            echo "Testing all tokens"
+          fi
+          
+          response=$(curl -s -w "\n%{http_code}" \
+            -X POST "${{ secrets.VERCEL_URL }}/heartbeat/test" \
+            -H "Content-Type: application/json" \
+            -H "X-Admin-Token: ${{ secrets.PPLX_ADMIN_TOKEN }}" \
+            -d "$body")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n -1)
+          
+          echo "Response (HTTP $http_code):"
+          echo "$body" | jq . 2>/dev/null || echo "$body"
+          
+          if [ "$http_code" != "200" ]; then
+            echo "::warning::Heartbeat test returned status $http_code"
+          fi
+          
+          # 检查是否有失败的 token
+          if echo "$body" | jq -e '.results | to_entries[] | select(.value.status == "error")' > /dev/null 2>&1; then
+            echo "::warning::Some tokens failed the heartbeat test"
+            echo "$body" | jq '.results | to_entries[] | select(.value.status == "error") | {id: .key, error: .value.error}'
+          else
+            echo "✅ All tokens passed heartbeat test"
+          fi
+
+      - name: Summary
+        run: |
+          echo "## 💓 Heartbeat Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Time**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Service**: ${{ secrets.VERCEL_URL }}" >> $GITHUB_STEP_SUMMARY

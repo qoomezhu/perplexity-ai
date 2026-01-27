@@ -13,6 +13,7 @@ MCP
 
 
 ## 更新记录
++ 2026-01-27：优化 Vercel 部署支持，添加 Token 保活 GitHub Actions
 + 2026-01-19：增加SKILL，`.claude/skills/perplexity-search`
 + 2026-01-16: 重构项目结构，增加oai 端点适配
 + 2026-01-13: 新增心跳检测功能，支持定时检测token健康状态并通过Telegram通知
@@ -133,6 +134,54 @@ MCP_TOKEN=sk-123456
 # 管理员 Token（用于号池管理 API：新增/删除 token 等操作）
 PPLX_ADMIN_TOKEN=your-admin-token
 ```
+
+---
+
+## Vercel 部署
+
+支持一键部署到 Vercel 平台，适合轻量使用场景。
+
+### 部署步骤
+
+1. Fork 本仓库
+2. 在 Vercel 中导入项目
+3. 配置环境变量：
+
+| 环境变量 | 说明 | 示例 |
+|----------|------|------|
+| `MCP_TOKEN` | MCP API 认证密钥 | `sk-your-secret-key` |
+| `PPLX_ADMIN_TOKEN` | 管理员 Token | `admin-secret-token` |
+| `TOKEN_POOL_JSON` | Token 池配置 (JSON 字符串) | 见下方 |
+
+**TOKEN_POOL_JSON 格式：**
+```json
+{"tokens":[{"id":"user1","csrf_token":"xxx","session_token":"yyy"}]}
+```
+
+### ⚠️ Vercel 上的 Token 保活
+
+> **重要提示：** Vercel 是 Serverless 架构，实例会在空闲后被回收，内置的心跳循环无法持续运行。
+
+**解决方案：使用 GitHub Actions 定时触发心跳**
+
+1. 在仓库 **Settings → Secrets and variables → Actions** 中添加：
+   - `VERCEL_URL`: 你的 Vercel 部署地址 (如 `https://your-app.vercel.app`)
+   - `PPLX_ADMIN_TOKEN`: 管理员 Token
+
+2. 项目已包含 `.github/workflows/heartbeat.yml`，会自动每 4 小时执行心跳检测
+
+3. 也可以手动触发：进入 **Actions → Token Heartbeat → Run workflow**
+
+### 保活建议
+
+为了减少冷启动并保持 Token 活跃，建议同时配置：
+
+| 服务 | 间隔 | 端点 | 作用 |
+|------|------|------|------|
+| UptimeRobot / cron-job.org | 5 分钟 | `/health` | 保持实例温热 |
+| GitHub Actions | 4 小时 | `/heartbeat/test` | Token 保活 |
+
+---
 
 ## 多token池配置（负载均衡）
 
