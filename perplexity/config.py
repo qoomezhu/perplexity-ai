@@ -43,7 +43,8 @@ PPLX_TOKEN_POOL_CONFIG: Optional[str] = os.getenv("PPLX_TOKEN_POOL_CONFIG", None
 # API Configuration
 API_BASE_URL = "https://www.perplexity.ai"
 API_VERSION = "2.18"
-API_TIMEOUT = 30
+# Default timeout in seconds. Can be overridden with env var PPLX_API_TIMEOUT.
+API_TIMEOUT = int(os.getenv("PPLX_API_TIMEOUT", "30"))
 
 # Endpoints
 ENDPOINT_AUTH_SESSION = f"{API_BASE_URL}/api/auth/session"
@@ -168,4 +169,4 @@ ADMIN_TOKEN: Optional[str] = os.getenv("PPLX_ADMIN_TOKEN", None)
 
 # Validation Patterns
 EMAIL_SUBJECT_PATTERN = "Sign in to Perplexity"
-SIGNIN_URL_PATTERN = r'"(https://www\.perplexity\.ai/api/auth/callback/email\?callbackUrl=.*?)"'
+SIGNIN_URL_PATTERN = r'"(https://www\\.perplexity\\.ai/api/auth/callback/email\\?callbackUrl=.*?)"'

@@ -11,6 +11,7 @@ import sys
 import json
 import random
 import mimetypes
+import threading
 from uuid import uuid4
 from curl_cffi import CurlMime, requests
 
@@ -21,6 +22,7 @@ from .config import (
     ENDPOINT_SSE_ASK,
     ENDPOINT_UPLOAD_URL,
     SOCKS_PROXY,
+    API_TIMEOUT,
 )
 from .emailnator import Emailnator
 
@@ -31,6 +33,11 @@ class Client:
     """
 
     def __init__(self, cookies={}):
+        # Serialize access to the underlying HTTP session.
+        # In serverless environments, a single instance can serve concurrent requests.
+        # curl_cffi Session is not guaranteed to be thread-safe.
+        self._lock = threading.Lock()
+
         # Build proxy configuration from SOCKS_PROXY env var
         # Format: socks5://[user[:pass]@]host[:port][#remark]
         proxy_url = None
@@ -60,7 +67,11 @@ class Client:
         self.timestamp = format(random.getrandbits(32), "08x")
 
         # Initialize session by making a GET request
-        self.session.get(ENDPOINT_AUTH_SESSION)
+        try:
+            self.session.get(ENDPOINT_AUTH_SESSION, timeout=API_TIMEOUT)
+        except Exception:
+            # Best effort; subsequent requests may still succeed
+            pass
 
     def get_user_info(self) -> dict:
         """
@@ -71,7 +82,8 @@ class Client:
                   or empty dict if anonymous/not logged in.
         """
         try:
-            resp = self.session.get(ENDPOINT_AUTH_SESSION)
+            with self._lock:
+                resp = self.session.get(ENDPOINT_AUTH_SESSION, timeout=API_TIMEOUT)
             if resp.ok:
                 return resp.json()
             return {}
@@ -88,17 +100,19 @@ class Client:
                 emailnator_cli = Emailnator(cookies)
 
                 # Send a POST request to initiate account creation
-                resp = self.session.post(
-                    ENDPOINT_AUTH_SIGNIN,
-                    data={
-                        "email": emailnator_cli.email,
-                        "csrfToken": self.session.cookies.get_dict()["next-auth.csrf-token"].split(
-                            "%"
-                        )[0],
-                        "callbackUrl": "https://www.perplexity.ai/",
-                        "json": "true",
-                    },
-                )
+                with self._lock:
+                    resp = self.session.post(
+                        ENDPOINT_AUTH_SIGNIN,
+                        data={
+                            "email": emailnator_cli.email,
+                            "csrfToken": self.session.cookies.get_dict()["next-auth.csrf-token"].split(
+                                "%"
+                            )[0],
+                            "callbackUrl": "https://www.perplexity.ai/",
+                            "json": "true",
+                        },
+                        timeout=API_TIMEOUT,
+                    )
 
                 # Check if the response is successful
                 if resp.ok:
@@ -121,7 +135,8 @@ class Client:
         new_account_link = self.signin_regex.search(emailnator_cli.open(msg["messageID"])).group(1)
 
         # Complete the account creation process
-        self.session.get(new_account_link)
+        with self._lock:
+            self.session.get(new_account_link, timeout=API_TIMEOUT)
 
         # Update query and file upload limits
         self.copilot = 5
@@ -197,19 +212,21 @@ class Client:
         uploaded_files = []
         for filename, file in files.items():
             file_type = mimetypes.guess_type(filename)[0]
-            file_upload_info = (
-                self.session.post(
-                    ENDPOINT_UPLOAD_URL,
-                    params={"version": "2.18", "source": "default"},
-                    json={
-                        "content_type": file_type,
-                        "file_size": sys.getsizeof(file),
-                        "filename": filename,
-                        "force_image": False,
-                        "source": "default",
-                    },
-                )
-            ).json()
+            with self._lock:
+                file_upload_info = (
+                    self.session.post(
+                        ENDPOINT_UPLOAD_URL,
+                        params={"version": "2.18", "source": "default"},
+                        json={
+                            "content_type": file_type,
+                            "file_size": sys.getsizeof(file),
+                            "filename": filename,
+                            "force_image": False,
+                            "source": "default",
+                        },
+                        timeout=API_TIMEOUT,
+                    )
+                ).json()
 
             # Upload the file to the server
             mp = CurlMime()
@@ -222,7 +239,10 @@ class Client:
                 data=file,
             )
 
-            upload_resp = self.session.post(file_upload_info["s3_bucket_url"], multipart=mp)
+            with self._lock:
+                upload_resp = self.session.post(
+                    file_upload_info["s3_bucket_url"], multipart=mp, timeout=API_TIMEOUT
+                )
 
             if not upload_resp.ok:
                 raise Exception("File upload error", upload_resp)
@@ -278,7 +298,13 @@ class Client:
         }
 
         # Send the query request and handle the response
-        resp = self.session.post(ENDPOINT_SSE_ASK, json=json_data, stream=True)
+        with self._lock:
+            resp = self.session.post(
+                ENDPOINT_SSE_ASK,
+                json=json_data,
+                stream=True,
+                timeout=API_TIMEOUT,
+            )
         chunks = []
 
         def stream_response(resp):

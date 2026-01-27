@@ -28,15 +28,8 @@ from perplexity.server import oai as _oai_routes  # noqa: F401,E402
 
 @mcp.custom_route("/health", methods=["GET"])
 async def health_check(request: Request) -> JSONResponse:
-    pool = get_pool()
-    status = pool.get_status()
-    return JSONResponse(
-        {
-            "status": "healthy",
-            "service": "perplexity-mcp",
-            "pool": {"total": status["total"], "available": status["available"]},
-        }
-    )
+    # Keep health checks minimal and non-sensitive for public probing.
+    return JSONResponse({"status": "ok"})
 
 
 # Initialize pool once per cold-start
