@@ -54,9 +54,9 @@ all = [
 perplexity = "perplexity.server.main:main"
 
 [project.urls]
-Homepage = "https://github.com/ESousa97/perplexity-ai"
-Repository = "https://github.com/ESousa97/perplexity-ai"
-Issues = "https://github.com/ESousa97/perplexity-ai/issues"
+Homepage = "https://github.com/qoomezhu/perplexity-ai"
+Repository = "https://github.com/qoomezhu/perplexity-ai"
+Issues = "https://github.com/qoomezhu/perplexity-ai/issues"
 
 [tool.setuptools.packages.find]
 include = ["perplexity*", "perplexity_async*"]
