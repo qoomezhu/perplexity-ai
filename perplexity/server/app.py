@@ -7,14 +7,17 @@ from typing import Any, Dict, Iterable, List, Optional, Union
 
 from fastmcp import FastMCP
 from fastmcp.server.middleware import Middleware, MiddlewareContext
-from fastmcp.server.dependencies import get_http_headers
+from fastmcp.server.dependencies import get_http_headers, get_http_request
 
 from .client_pool import ClientPool
 from ..config import SEARCH_LANGUAGES
 from ..exceptions import ValidationError
 
 from .utils import (
-    sanitize_query, validate_file_data, validate_query_limits, validate_search_params,
+    sanitize_query,
+    validate_file_data,
+    validate_query_limits,
+    validate_search_params,
 )
 
 # API 密钥配置（从环境变量读取，默认为 sk-123456）
@@ -28,12 +31,30 @@ class AuthMiddleware(Middleware):
         self.token = token
 
     async def on_request(self, context: MiddlewareContext, call_next):
-        """验证请求的 Authorization header"""
+        """验证请求的 Authorization header。
+
+        Note:
+        - /health 需要免鉴权，便于 Vercel / Uptime 监控探活
+        """
+
+        # Best-effort: read request path (only available in HTTP transport)
+        path = None
+        try:
+            req = get_http_request()
+            path = getattr(req.url, "path", None)
+        except Exception:
+            path = None
+
+        # Allow unauthenticated health checks
+        if path == "/health":
+            return await call_next(context)
+
         headers = get_http_headers()
         if headers:  # HTTP 模式下才有 headers
             auth = headers.get("authorization") or headers.get("Authorization")
             if auth != f"Bearer {self.token}":
                 raise PermissionError("Unauthorized: Invalid or missing Bearer token")
+
         return await call_next(context)
 
 
@@ -147,10 +168,8 @@ def run_query(
 
         # Ensure SEARCH_LANGUAGES is not None before using 'in'
         if SEARCH_LANGUAGES is None or language not in SEARCH_LANGUAGES:
-            valid_langs = ', '.join(SEARCH_LANGUAGES) if SEARCH_LANGUAGES else "en-US"
-            raise ValidationError(
-                f"Invalid language '{language}'. Choose from: {valid_langs}"
-            )
+            valid_langs = ", ".join(SEARCH_LANGUAGES) if SEARCH_LANGUAGES else "en-US"
+            raise ValidationError(f"Invalid language '{language}'. Choose from: {valid_langs}")
 
         validate_search_params(mode, model, chosen_sources, own_account=client.own)
         normalized_files = normalize_files(files)
