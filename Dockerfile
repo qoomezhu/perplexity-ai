@@ -42,7 +42,8 @@ COPY --from=frontend-builder --chown=user /frontend/dist ./perplexity/server/web
 COPY --chown=user entrypoint.sh ./
 RUN chmod +x entrypoint.sh
 
-ENV PPLX_TOKEN_POOL_CONFIG=/home/user/app/token_pool_config.json
+# 与 entrypoint.sh 生成的路径保持一致
+ENV PPLX_TOKEN_POOL_CONFIG=/home/user/app/config/token_pool_config.json
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 7860
