@@ -11,6 +11,9 @@ CONFIG_FILE="/home/user/app/config/token_pool_config.json"
 echo "🔧 Perplexity MCP Server for Hugging Face Space"
 echo "================================================"
 
+# 确保配置目录存在 (关键修复)
+mkdir -p "$(dirname "$CONFIG_FILE")"
+
 if [ -n "$TOKEN_POOL_JSON" ]; then
     echo "📝 从 TOKEN_POOL_JSON 环境变量生成配置..."
     echo "$TOKEN_POOL_JSON" > "$CONFIG_FILE"
