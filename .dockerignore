@@ -1,53 +1,107 @@
+# ============================================
+# Docker Build Ignore File
+# 优化镜像构建速度和大小
+# ============================================
+
 # Git
 .git
+.github
 .gitignore
 .gitattributes
 
-# Python
-__pycache__
+# Development & IDE
+.claude
+.vscode
+.idea
+*.swp
+*.swo
+
+# Documentation (保留 README.md 用于 pyproject.toml)
+docs/
+examples/
+images/
+*.md
+!README.md
+!README_HF.md
+
+# Python cache & build
+__pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-.venv
-venv
-env
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+tests/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Node.js (前端构建时会单独处理)
+node_modules/
+perplexity/server/web/node_modules/
+.npm
+.pnpm-store
+
+# Environment & Secrets
 .env
 .env.*
-*.egg-info
-*.egg
-dist
-build
-.eggs
+!.env.example
+token_pool_config.json
+*.pem
+*.key
 
-# 开发工具
-.pytest_cache
-.mypy_cache
-.coverage
-htmlcov
-.tox
-.nox
+# Docker (避免递归)
+docker-compose*.yml
+Dockerfile.local
 
-# IDE
-.idea
-.vscode
-*.swp
-*.swo
+# Deployment configs (不需要打包)
+vercel.json
+railway.json
+render.yaml
+fly.toml
 
-# 测试和文档
-tests/
-docs/
-*.md
-!README.md
-
-# 其他
-nul
+# Lock files (使用 pyproject.toml)
 uv.lock
+poetry.lock
+Pipfile.lock
+
+# Logs
 *.log
+logs/
+
+# OS
 .DS_Store
 Thumbs.db
 
-# Docker
-Dockerfile*
-docker-compose*
-.docker
+# Temporary
+tmp/
+temp/
+*.tmp
+*.bak
