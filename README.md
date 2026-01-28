@@ -1,5 +1,29 @@
+---
+title: Perplexity AI MCP Server
+emoji: 🔍
+colorFrom: blue
+colorTo: purple
+sdk: docker
+pinned: false
+license: mit
+app_port: 7860
+---
+
 ## 源项目地址：
 https://github.com/helallao/perplexity-ai
+
+## 🚀 一键部署到 Hugging Face Space
+
+[![Deploy to HF Spaces](https://huggingface.co/datasets/huggingface/badges/resolve/main/deploy-to-spaces-lg.svg)](https://huggingface.co/new-space?template=qoomezhu/perplexity-ai)
+
+点击上方按钮，然后在 Space Settings → Secrets 中配置：
+
+| Secret | 说明 |
+|--------|------|
+| `MCP_TOKEN` | API 认证密钥 (如 `sk-xxxxx`) |
+| `TOKEN_POOL_JSON` | Token 配置，格式: `{"tokens":[{"id":"u1","csrf_token":"xxx","session_token":"yyy"}]}` |
+
+---
 
 ## 展示
 ADMIN
@@ -13,6 +37,7 @@ MCP
 
 
 ## 更新记录
++ 2026-01-28：添加 Hugging Face Space Docker 一键部署支持
 + 2026-01-27：优化 Vercel 部署支持，添加 Token 保活 GitHub Actions
 + 2026-01-19：增加SKILL，`.claude/skills/perplexity-search`
 + 2026-01-16: 重构项目结构，增加oai 端点适配

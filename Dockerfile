@@ -1,66 +1,49 @@
-# Perplexity MCP Server Docker Image
-# 使用多阶段构建优化镜像大小
+# ============================================
+# Hugging Face Spaces Docker Deployment
+# 端口: 7860 | 用户: non-root
+# ============================================
 
 # ============ 阶段1: 前端构建 ============
 FROM node:20-alpine AS frontend-builder
-
 WORKDIR /frontend
-
-# 复制前端项目文件
-COPY perplexity/server/web/package.json perplexity/server/web/package-lock.json* ./
-
-# 安装依赖
-RUN npm ci --prefer-offline --no-audit
-
-# 复制前端源码
+COPY perplexity/server/web/package*.json ./
+RUN npm ci --prefer-offline --no-audit 2>/dev/null || npm install
 COPY perplexity/server/web/ ./
-
-# 构建前端
 RUN npm run build
 
-# ============ 阶段2: Python 构建 ============
-FROM python:3.12-slim AS python-builder
-
-WORKDIR /build
-
-# 安装构建依赖 (curl_cffi 需要编译)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# 先复制依赖文件，利用 Docker 缓存
-COPY pyproject.toml README.md ./
-COPY perplexity/ ./perplexity/
-COPY perplexity_async/ ./perplexity_async/
-
-# 安装到独立目录，方便后续复制
-RUN pip install --no-cache-dir --prefix=/install .
-
-# ============ 阶段3: 运行时镜像 ============
+# ============ 阶段2: Python 运行时 ============
 FROM python:3.12-slim
 
+ENV PORT=7860
 WORKDIR /app
 
-# 只安装运行时必需的系统依赖
+# 安装系统依赖
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
+    curl build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# 从 Python 构建阶段复制已安装的 Python 包
-COPY --from=python-builder /install/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+# 创建非 root 用户
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user
+ENV PATH="/home/user/.local/bin:$PATH"
+WORKDIR /home/user/app
 
-# 复制应用代码
-COPY perplexity/ ./perplexity/
+# 安装 Python 依赖
+COPY --chown=user pyproject.toml README.md ./
+COPY --chown=user perplexity/ ./perplexity/
+COPY --chown=user perplexity_async/ ./perplexity_async/
+RUN pip install --no-cache-dir --user .
 
-# 从前端构建阶段复制构建产物
-COPY --from=frontend-builder /frontend/dist ./perplexity/server/web/dist
+# 复制前端构建产物
+COPY --from=frontend-builder --chown=user /frontend/dist ./perplexity/server/web/dist
 
-# 设置默认 token pool 配置路径（通过 volume 挂载）
-ENV PPLX_TOKEN_POOL_CONFIG=/app/token_pool_config.json
+# 复制启动脚本
+COPY --chown=user entrypoint.sh ./
+RUN chmod +x entrypoint.sh
 
-# 暴露端口
-EXPOSE 8000
+ENV PPLX_TOKEN_POOL_CONFIG=/home/user/app/token_pool_config.json
+ENV PYTHONUNBUFFERED=1
 
-# 启动命令
-CMD ["python", "-m", "perplexity.server"]
+EXPOSE 7860
+CMD ["./entrypoint.sh"]
