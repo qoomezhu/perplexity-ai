@@ -26,15 +26,19 @@ jobs:
             exit 1
           fi
           
-          # 1. 配置 Git 用户
+          # 1. 暴力清理：删除所有可能导致报错的图片目录
+          echo "Cleaning up images..."
+          rm -rf images
+          
+          # 2. 配置 Git 用户
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           
-          # 2. 彻底清理历史中的大文件 (防止 HF 拒绝)
+          # 3. 彻底清理历史中的大文件 (防止 HF 拒绝)
           # 创建一个孤儿分支（无历史记录），只包含当前文件
           git checkout --orphan temp-branch
           git add .
-          git commit -m "deploy: sync to huggingface space (squashed)"
+          git commit -m "deploy: sync to huggingface space (clean build)"
           
-          # 3. 强制推送到 HF
+          # 4. 强制推送到 HF
           git push --force "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE}" temp-branch:main
