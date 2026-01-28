@@ -1,6 +1,6 @@
 ---
 title: Perplexity AI MCP Server
-emoji: ""
+emoji: 🔍
 colorFrom: blue
 colorTo: purple
 sdk: docker
