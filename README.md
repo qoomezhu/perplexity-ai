@@ -12,29 +12,49 @@ app_port: 7860
 ## 源项目地址：
 https://github.com/helallao/perplexity-ai
 
-## Hugging Face Spaces（手机可部署，无需电脑）
+## 📱 手机部署指南（针对 qoomezhu）
 
-你截图里的 400 报错是因为 `https://huggingface.co/new-space?template=...` 的 `template` 参数只接受 Hugging Face 官方内置模板，不支持直接用 GitHub 仓库当 template。
+由于 Hugging Face 官方限制，无法直接通过链接一键部署。请按以下步骤操作（全程手机网页即可完成）：
 
-推荐方式：用 GitHub Actions 把本仓库自动同步到你的 Hugging Face Space（一次设置，之后每次 push 自动部署）。
+### 第1步：在 Hugging Face 创建 Space
+1. 打开 [Create New Space](https://huggingface.co/new-space)
+2. 填写信息：
+   - **Space name**: `perplexity-mcp`
+   - **License**: `mit`
+   - **SDK**: 选择 **Docker** (必须选这个)
+   - **Space hardware**: `CPU basic` (免费)
+   - **Visibility**: `Public` 或 `Private`
+3. 点击 **Create Space**
 
-### A. 在 Hugging Face 创建 Space
-1. 打开 https://huggingface.co/new-space
-2. SDK 选择 **Docker**
-3. Space name 自己取（例如 `perplexity-mcp`）
+### 第2步：配置 Space 环境变量 (Secrets)
+进入你刚创建的 Space (`qoomezhu/perplexity-mcp`) -> **Settings** -> **Repository secrets** -> **New secret**：
 
-### B. 在 Space 里设置 Secrets
-Space → Settings → Repository secrets：
-- `MCP_TOKEN`：访问鉴权 token
-- `TOKEN_POOL_JSON`：形如 `{"tokens":[{"id":"u1","csrf_token":"xxx","session_token":"yyy"}]}`
+| Name | Value (示例) |
+|------|-------------|
+| `MCP_TOKEN` | `sk-123456` (你自己设定的密钥) |
+| `TOKEN_POOL_JSON` | `{"tokens":[{"id":"u1","csrf_token":"xxx","session_token":"yyy"}]}` |
 
-### C. 在 GitHub 仓库设置 Actions Secrets（用于自动同步到 HF）
-GitHub → Settings → Secrets and variables → Actions：
-- `HF_TOKEN`：你的 Hugging Face Access Token（需要 write 权限）
-- `HF_USERNAME`：你的 Hugging Face 用户名
-- `HF_SPACE`：你刚创建的 Space 名（不含用户名）
+> **如何获取 Token**: 手机浏览器登录 perplexity.ai -> 菜单 -> 桌面版网站 -> 开发者工具 -> Application -> Cookies
+> - `csrf_token` 对应 `next-auth.csrf-token`
+> - `session_token` 对应 `__Secure-next-auth.session-token`
 
-然后在 GitHub 的 Actions 标签页里手动运行一次 “Sync to Hugging Face Space”，或任意提交一次代码，即会触发同步。
+### 第3步：连接 GitHub 自动部署
+回到本 GitHub 仓库 -> **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**：
+
+| Name | Value | 说明 |
+|------|-------|------|
+| `HF_TOKEN` | `hf_xxxx` | 你的 HF Access Token (需 Write 权限) |
+| `HF_USERNAME` | `qoomezhu` | 你的 HF 用户名 |
+| `HF_SPACE` | `perplexity-mcp` | 你的 Space 名称 |
+
+> **获取 HF_TOKEN**: [Hugging Face Settings -> Access Tokens](https://huggingface.co/settings/tokens) -> Create new token -> 勾选 "Write" 权限
+
+### 第4步：触发部署
+1. 点击本仓库上方的 **Actions** 标签页
+2. 点击左侧 **Sync to Hugging Face Space**
+3. 点击右侧 **Run workflow** -> **Run workflow**
+
+等待约 2-3 分钟，Action 显示绿色对勾 ✅ 后，你的 Space 就会自动开始构建并运行！
 
 ---
 
@@ -102,7 +122,7 @@ cp token_pool_config-example.json token_pool_config.json
 
 > **获取 Token 的方法：** 打开 perplexity.ai -> F12 开发者工具 -> Application -> Cookies
 > - `csrf_token` 对应 `next-auth.csrf-token`
-> - `session_token` 对应 `__Secure-next-auth.session-token`
+> - `session_token` = `__Secure-next-auth.session-token`
 
 ### 心跳检测配置（可选）
 
