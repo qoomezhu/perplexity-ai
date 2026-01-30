@@ -46,7 +46,7 @@ git push hf main
 | Secret 名称 | 说明 | 必填 |
 |------------|------|-----|
 | `MCP_TOKEN` | API 认证密钥 (如: `sk-xxxxx`) | ✅ |
-| `PPLX_ADMIN_TOKEN` | 管理员 Token | ❌ |
+| `PPLX_ADMIN_TOKEN` | 管理员 Token（用于 /heartbeat/* /pool/* 这类管理接口） | 🔸 建议 |
 | `TOKEN_POOL_JSON` | 完整 Token 池 JSON 配置 | 🔸 二选一 |
 | `PPLX_CSRF_TOKEN` | 单个 CSRF Token | 🔸 二选一 |
 | `PPLX_SESSION_TOKEN` | 单个 Session Token | 🔸 二选一 |
@@ -111,14 +111,28 @@ curl https://YOUR-SPACE.hf.space/v1/chat/completions \
 
 HF Space 免费版会在空闲后休眠，首次请求需等待 ~30 秒。
 
-### Token 保活
+### Token 保活（重要）
 
-Serverless 环境无法运行内置心跳，建议使用外部 cron 服务:
+- `/health` 只能用于 **Space 保活（防休眠）**，不会验证 Perplexity 账号是否仍处于登录态。
+- `/heartbeat/test` 用于 **Token 检测/保活**：会先检查 `https://www.perplexity.ai/api/auth/session` 是否仍登录，再做一次轻量请求。
+
+> 注意：如果 Perplexity 的 session cookie 存在“绝对过期”（例如 ~48h），任何 keepalive 都不保证永久有效，只能在可续期的窗口内尽量延长，或定期更新 token。
+
+建议使用外部 cron 服务:
 
 | 服务 | 间隔 | 端点 | 作用 |
 |------|------|------|------|
 | [cron-job.org](https://cron-job.org) | 5 分钟 | `/health` | 防止休眠 |
-| GitHub Actions | 4 小时 | `/heartbeat/test` | Token 保活 |
+| GitHub Actions / 其它支持 Header 的 Cron | 4 小时 | `/heartbeat/test` | Token 检测/保活（需 `X-Admin-Token`） |
+
+示例（/heartbeat/test）：
+
+```bash
+curl -X POST https://YOUR-SPACE.hf.space/heartbeat/test \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: YOUR_PPLX_ADMIN_TOKEN" \
+  -d '{}'
+```
 
 ### 资源限制
 
