@@ -3,6 +3,16 @@ Client pool for managing multiple Perplexity API tokens with load balancing.
 
 Provides round-robin client selection with exponential backoff retry on failures.
 Supports heartbeat testing to automatically verify token health.
+
+Notes
+-----
+- For Perplexity cookie-based auth, the NextAuth session cookie may have an absolute expiry
+  (commonly observed around ~48 hours). Heartbeat/keepalive can help detect and sometimes
+  extend sessions if the upstream supports sliding refresh, but it cannot guarantee
+  indefinite validity.
+- Therefore heartbeat is implemented as:
+  (1) Check login status via /api/auth/session
+  (2) Do a lightweight request (auto mode) without incognito to generate real activity.
 """
 
 import asyncio
@@ -42,7 +52,7 @@ class ClientWrapper:
         self.weight = self.DEFAULT_WEIGHT  # Higher weight = higher priority
         self.pro_fail_count = 0  # Track pro-specific failures
         self.enabled = True  # Whether this client is enabled for use
-        self.state = "unknown"  # Token state: "normal", "offline", "unknown"
+        self.state = "unknown"  # Token state: "normal", "offline", "unknown", "anonymous"
         self.last_heartbeat: Optional[float] = None  # Last heartbeat check timestamp
 
     def is_available(self) -> bool:
@@ -162,12 +172,19 @@ class ClientPool:
                 return
 
         # Priority 4: Single token from environment variables
-        csrf_token = os.getenv("PPLX_NEXT_AUTH_CSRF_TOKEN")
+        # Compatible env names:
+        # - PPLX_CSRF_TOKEN (preferred)
+        # - PPLX_NEXT_AUTH_CSRF_TOKEN (legacy)
+        # - PPLX_SESSION_TOKEN
+        csrf_token = os.getenv("PPLX_CSRF_TOKEN") or os.getenv("PPLX_NEXT_AUTH_CSRF_TOKEN")
         session_token = os.getenv("PPLX_SESSION_TOKEN")
         if csrf_token and session_token:
             self._add_client_internal(
                 "default",
-                {"next-auth.csrf-token": csrf_token, "__Secure-next-auth.session-token": session_token},
+                {
+                    "next-auth.csrf-token": csrf_token,
+                    "__Secure-next-auth.session-token": session_token,
+                },
             )
             self._mode = "single"
             return
@@ -391,9 +408,7 @@ class ClientPool:
                     return top_weight_clients[0].id, top_weight_clients[0].client
 
                 # Multiple clients with same weight - use round-robin among them
-                # Find the next client in rotation order that's in our top weight list
                 top_weight_ids = {w.id for w in top_weight_clients}
-                start_index = self._index
 
                 for _ in range(len(self._rotation_order)):
                     client_id = self._rotation_order[self._index]
@@ -577,10 +592,14 @@ class ClientPool:
 
     async def test_client(self, client_id: str) -> Dict[str, Any]:
         """
-        Test a single client by performing a query.
+        Test a single client.
+
+        New semantics (to avoid false positives):
+        1) If the client is cookie-authenticated, first call /api/auth/session and require "user".
+        2) Then perform a lightweight query with incognito=False to generate real session activity.
 
         Returns:
-            Dict with status and result
+            Dict with status/state and optional diagnostic fields
         """
         with self._lock:
             wrapper = self.clients.get(client_id)
@@ -588,11 +607,43 @@ class ClientPool:
                 return {"status": "error", "message": f"Client '{client_id}' not found"}
             client = wrapper.client
 
-        question = self._heartbeat_config.get("question", "现在是农历几月几号？")
         prev_state = wrapper.state
+        now = time.time()
+
+        # Anonymous client: no cookies, cannot validate login
+        if not client.own:
+            with self._lock:
+                wrapper.state = "anonymous"
+                wrapper.last_heartbeat = now
+            return {"status": "ok", "state": "anonymous", "client_id": client_id}
+
+        # Step 1: Check login status
+        user_info: Dict[str, Any] = await asyncio.to_thread(client.get_user_info)
+        logged_in = isinstance(user_info, dict) and bool(user_info.get("user"))
+        expires = user_info.get("expires") if isinstance(user_info, dict) else None
+
+        if not logged_in:
+            with self._lock:
+                wrapper.state = "offline"
+                wrapper.last_heartbeat = now
+
+            if prev_state != "offline":
+                await self._send_telegram_notification(
+                    f"⚠️ perplexity mcp: <b>{client_id}</b> not logged in (session expired?)."
+                )
+
+            return {
+                "status": "error",
+                "state": "offline",
+                "client_id": client_id,
+                "reason": "not_logged_in",
+                "expires": expires,
+            }
+
+        # Step 2: Lightweight request to keep warm (best-effort)
+        question = self._heartbeat_config.get("question", "现在是农历几月几号？")
 
         try:
-            # Perform a simple search query
             response = await asyncio.to_thread(
                 client.search,
                 question,
@@ -602,43 +653,59 @@ class ClientPool:
                 files={},
                 stream=False,
                 language="zh-CN",
-                incognito=True,
+                # IMPORTANT: do NOT use incognito here
+                incognito=False,
             )
 
-            # Check if response contains answer
-            if response and "answer" in response:
-                with self._lock:
-                    wrapper.state = "normal"
-                    wrapper.last_heartbeat = time.time()
+            ok = bool(response) and ("answer" in response)
+            with self._lock:
+                wrapper.state = "normal" if ok else "offline"
+                wrapper.last_heartbeat = now
+
+            if ok:
                 logger.info(f"Heartbeat test passed for client '{client_id}'")
-                return {"status": "ok", "state": "normal", "client_id": client_id}
-            else:
-                with self._lock:
-                    wrapper.state = "offline"
-                    wrapper.last_heartbeat = time.time()
-                logger.warning(f"Heartbeat test failed for client '{client_id}': no answer in response")
+                return {
+                    "status": "ok",
+                    "state": "normal",
+                    "client_id": client_id,
+                    "expires": expires,
+                }
 
-                # Send Telegram notification if state changed to offline
-                if prev_state != "offline":
-                    await self._send_telegram_notification(
-                        f"⚠️ perplexity mcp: <b>{client_id}</b> test failed."
-                    )
+            logger.warning(f"Heartbeat test failed for client '{client_id}': no answer in response")
 
-                return {"status": "error", "state": "offline", "client_id": client_id}
+            if prev_state != "offline":
+                await self._send_telegram_notification(
+                    f"⚠️ perplexity mcp: <b>{client_id}</b> heartbeat query failed (no answer)."
+                )
+
+            return {
+                "status": "error",
+                "state": "offline",
+                "client_id": client_id,
+                "reason": "no_answer",
+                "expires": expires,
+            }
 
         except Exception as e:
             with self._lock:
                 wrapper.state = "offline"
-                wrapper.last_heartbeat = time.time()
+                wrapper.last_heartbeat = now
+
             logger.error(f"Heartbeat test failed for client '{client_id}': {e}")
 
-            # Send Telegram notification if state changed to offline
             if prev_state != "offline":
                 await self._send_telegram_notification(
-                    f"⚠️ perplexity mcp: <b>{client_id}</b> test failed."
+                    f"⚠️ perplexity mcp: <b>{client_id}</b> heartbeat exception: {e}"
                 )
 
-            return {"status": "error", "state": "offline", "client_id": client_id, "error": str(e)}
+            return {
+                "status": "error",
+                "state": "offline",
+                "client_id": client_id,
+                "reason": "exception",
+                "error": str(e),
+                "expires": expires,
+            }
 
     async def test_all_clients(self) -> Dict[str, Any]:
         """
