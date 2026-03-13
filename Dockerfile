@@ -59,8 +59,11 @@ COPY --from=frontend-builder /frontend/dist ./perplexity/server/web/dist
 # 设置默认 token pool 配置路径（通过 volume 挂载）
 ENV PPLX_TOKEN_POOL_CONFIG=/app/token_pool_config.json
 
+# 设置默认端口（可通过环境变量覆盖）
+ENV PORT=8000
+
 # 暴露端口
-EXPOSE 8000
+EXPOSE ${PORT}
 
 # 启动命令
 CMD ["python", "-m", "perplexity.server"]
