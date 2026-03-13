@@ -20,21 +20,42 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Validate secrets
+        shell: bash
         run: |
-          if [ -z "$HF_TOKEN" ]; then
+          set -euo pipefail
+          if [ -z "${HF_TOKEN:-}" ]; then
             echo "::error::Missing required secret: HF_TOKEN"
             exit 1
           fi
+          echo "HF deploy target: ${HF_USERNAME}/${HF_SPACE_NAME}"
+
+      - name: Install tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y rsync
+
+      - name: Verify HF repo access
+        shell: bash
+        run: |
+          set -euo pipefail
+          git ls-remote "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}" >/dev/null
 
       - name: Clone Hugging Face Space repo
+        shell: bash
         run: |
+          set -euo pipefail
+          rm -rf hf-space
           git clone "https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${HF_SPACE_NAME}" hf-space
 
       - name: Sync files to Space
+        shell: bash
         run: |
+          set -euo pipefail
           rsync -av --delete \
             --exclude '.git/' \
             --exclude '.github/' \
@@ -47,7 +68,9 @@ jobs:
           cp Dockerfile.hf hf-space/Dockerfile
 
       - name: Commit and push
+        shell: bash
         run: |
+          set -euo pipefail
           cd hf-space
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
