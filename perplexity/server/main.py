@@ -96,10 +96,42 @@ def run_server(
 ) -> None:
     """Start the MCP server with the requested transport."""
     # Initialize the pool on startup
-    get_pool()
+    pool = get_pool()
 
     if transport == "http":
-        mcp.run(transport="http", host=host, port=port)
+        # FastMCP 3.x 在部分场景下 custom_route 可能不生效。
+        # 这里直接在底层 ASGI app 注入 /health，确保在 HF Space 可用。
+        try:
+            import uvicorn
+            from starlette.requests import Request
+            from starlette.responses import JSONResponse
+
+            try:
+                app = mcp.http_app(path="/mcp")
+            except TypeError:
+                app = mcp.http_app()
+
+            async def health_check(request: Request) -> JSONResponse:
+                status = pool.get_status()
+                return JSONResponse(
+                    {
+                        "status": "healthy",
+                        "service": "perplexity-mcp",
+                        "pool": {
+                            "total": status.get("total", 0),
+                            "available": status.get("available", 0),
+                        },
+                    }
+                )
+
+            # 直接在底层 Starlette app 增加路由
+            app.add_route("/health", health_check, methods=["GET"])
+            logger.info("Starting HTTP server with explicit /health route")
+            uvicorn.run(app, host=host, port=port)
+            return
+        except Exception as exc:
+            logger.warning("Failed to start via explicit ASGI app, fallback to mcp.run(): %s", exc)
+            mcp.run(transport="http", host=host, port=port)
     else:
         mcp.run()
 
