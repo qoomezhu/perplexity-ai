@@ -8,7 +8,7 @@ on:
       space_name:
         description: "Hugging Face Space name"
         required: false
-        default: "ppl"
+        default: ""
 
 jobs:
   deploy:
@@ -16,7 +16,7 @@ jobs:
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_USERNAME: ${{ secrets.HF_USERNAME || 'qoomezhu' }}
-      HF_SPACE_NAME: ${{ github.event.inputs.space_name || 'ppl' }}
+      HF_SPACE_NAME: ${{ github.event.inputs.space_name || secrets.HF_SPACE || 'ppl' }}
 
     steps:
       - name: Checkout
@@ -28,6 +28,14 @@ jobs:
           set -euo pipefail
           if [ -z "${HF_TOKEN:-}" ]; then
             echo "::error::Missing required secret: HF_TOKEN"
+            exit 1
+          fi
+          if [ -z "${HF_USERNAME:-}" ]; then
+            echo "::error::Missing required value: HF_USERNAME"
+            exit 1
+          fi
+          if [ -z "${HF_SPACE_NAME:-}" ]; then
+            echo "::error::Missing required value: HF_SPACE_NAME"
             exit 1
           fi
           echo "HF deploy target: ${HF_USERNAME}/${HF_SPACE_NAME}"
@@ -57,6 +65,7 @@ jobs:
         run: |
           set -euo pipefail
           rsync -av --delete \
+            --exclude 'hf-space/' \
             --exclude '.git/' \
             --exclude '.github/' \
             --exclude '.venv/' \

@@ -8,10 +8,14 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    env:
+      HF_USERNAME: ${{ secrets.HF_USERNAME || 'qoomezhu' }}
+      HF_SPACE_NAME: ${{ secrets.HF_SPACE || 'ppl' }}
     steps:
       - name: Ping health endpoint
         run: |
-          URL="https://qoomezhu-ppl.hf.space/health"
+          URL="https://${HF_USERNAME}-${HF_SPACE_NAME}.hf.space/health"
+          echo "Pinging ${URL}"
           for i in 1 2 3; do
             if curl -fsS --max-time 20 "$URL" > /dev/null; then
               echo "Ping success: $URL"
