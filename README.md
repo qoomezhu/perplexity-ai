@@ -20,6 +20,7 @@ An unofficial Python API for Perplexity.ai that exposes search capabilities via 
 <img width="1894" height="989" alt="image" src="https://github.com/user-attachments/assets/4a495432-8305-4820-8b4a-d7e54986ba45" />
 
 ## Changelog
++ **2026-03-13**: Added Hugging Face Spaces deployment support with keep-alive mechanism
 + **2026-03-10**: v1.9.4 — Refresh the supported model lineup: add GPT-5.4 / GPT-5.4 Thinking, remove GPT-5.2 and Grok 4.1 variants, and sync MCP, OpenAI model exposure, tests, and docs.
 + **2026-02-20**: v1.9.1 — Fix frontend version display: sync `package.json` version so admin UI shows correct `MANAGER_vX.X.X`.
 + **2026-02-20**: v1.9.0 — Playground file attachment improvements: clipboard image paste (Ctrl+V) support; image files now show inline thumbnail previews in the input area.
@@ -149,6 +150,17 @@ services:
 MCP_PORT=8000
 MCP_TOKEN=sk-123456
 PPLX_ADMIN_TOKEN=your-admin-token
+```
+
+### Hugging Face Spaces Deployment
+
+For deploying to Hugging Face Spaces, see [README-hf.md](README-hf.md) for detailed instructions.
+
+Quick deployment:
+
+```bash
+# Run the deployment script
+./deploy_hf.sh
 ```
 
 ## Multi-Token Pool (Load Balancing)
