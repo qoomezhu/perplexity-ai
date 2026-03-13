@@ -1,163 +1,62 @@
 # Hugging Face Spaces 部署指南
 
-本指南将帮助您将 Perplexity MCP Server 部署到 Hugging Face Spaces。
+本指南用于将 Perplexity MCP Server 部署到 Hugging Face Spaces（Docker），并适配**无持久卷**场景。
 
-## 前提条件
+## 一、前提条件
 
 1. Hugging Face 账户
-2. Perplexity AI 账户的 CSRF Token 和 Session Token
+2. 已创建 Space（Docker SDK）
+3. Perplexity 账户的 `csrf_token` 与 `session_token`
 
-## 部署步骤
+## 二、创建 Space
 
-### 1. 创建 Hugging Face Space
+1. 打开 https://huggingface.co/spaces/new
+2. 选择：
+   - SDK: **Docker**
+   - Space Name: 例如 `ppl`
+   - Visibility: Public / Private
 
-1. 访问 [huggingface.co/spaces/new](https://huggingface.co/spaces/new)
-2. 填写以下信息：
-   - **Space name**: 选择一个名称（如 `perplexity-mcp-server`）
-   - **Owner**: 您的账户或组织
-   - **Visibility**: Public 或 Private
-   - **Space SDK**: 选择 **"Docker"**
-   - **Hardware**: 选择适当的硬件（免费 tier 通常足够）
-3. 点击 "Create Space"
+## 三、配置 Secrets（关键）
 
-### 2. 配置 Secrets
+在 Space -> Settings -> Secrets 添加：
 
-在 Space 设置中添加以下 Secrets：
+- `MCP_TOKEN`：API 访问 Bearer Token（务必使用高强度随机值）
+- `PPLX_ADMIN_TOKEN`：管理接口 Token
+- `PPLX_TOKEN_POOL_CONFIG`：**JSON 字符串**（不需要持久卷）
 
-1. **MCP_TOKEN**: 您的 API 认证令牌（默认: `sk-123456`）
-2. **PPLX_ADMIN_TOKEN**: 管理员令牌（用于管理界面）
-3. **PPLX_TOKEN_POOL_CONFIG**: Token 池配置（JSON 格式）
-
-### 3. Token 池配置示例
-
-在 `PPLX_TOKEN_POOL_CONFIG` Secret 中添加以下 JSON 配置：
+示例（单行 JSON）：
 
 ```json
-{
-  "heart_beat": {
-    "enable": true,
-    "question": "今天是几号？",
-    "interval": 6,
-    "tg_bot_token": "your-telegram-bot-token",
-    "tg_chat_id": "your-telegram-chat-id"
-  },
-  "fallback": {
-    "fallback_to_auto": true
-  },
-  "tokens": [
-    {
-      "id": "account1@example.com",
-      "csrf_token": "your-csrf-token-1",
-      "session_token": "your-session-token-1"
-    }
-  ]
-}
+{"heart_beat":{"enable":false},"fallback":{"fallback_to_auto":true},"incognito":{"enabled":true},"tokens":[{"id":"account1@example.com","csrf_token":"your-csrf-token","session_token":"your-session-token"}]}
 ```
 
-### 4. 获取 Perplexity Token
+> 当前已支持：`PPLX_TOKEN_POOL_CONFIG` 可以是文件路径 / JSON 字符串 / Base64 JSON。
 
-1. 登录 [perplexity.ai](https://perplexity.ai)
-2. 按 F12 打开开发者工具
-3. 转到 Application → Cookies
-4. 复制以下值：
-   - `next-auth.csrf-token` → `csrf_token`
-   - `__Secure-next-auth.session-token` → `session_token`
+## 四、保活策略
 
-### 5. 部署代码
+### 推荐：外部 Cron（有效）
 
-将以下文件推送到您的 Space 仓库：
-
-1. `Dockerfile.hf` → 重命名为 `Dockerfile`
-2. `keep_alive.sh`
-3. 所有项目代码
-
-### 6. 环境变量配置
-
-在 Space 设置中配置以下环境变量：
-
-- `PORT=7860`（Hugging Face Spaces 默认端口）
-- `MCP_TOKEN=your-mcp-token`
-- `PPLX_ADMIN_TOKEN=your-admin-token`
-
-## 保活机制
-
-本部署包含自动保活机制：
-
-1. **Cron 任务**: 每 5 分钟访问健康检查端点
-2. **健康检查**: `/health` 端点返回服务状态
-3. **日志记录**: 保活日志保存在 `/var/log/keep_alive.log`
-
-## 访问服务
-
-部署成功后，您可以通过以下 URL 访问服务：
-
-- **主服务**: `https://your-username-your-space-name.hf.space/`
-- **管理界面**: `https://your-username-your-space-name.hf.space/admin/`
-- **Playground**: `https://your-username-your-space-name.hf.space/playground/`
-- **健康检查**: `https://your-username-your-space-name.hf.space/health`
-- **API 文档**: `https://your-username-your-space-name.hf.space/v1/models`
-
-## API 使用示例
-
-### MCP 端点
+使用你自己的外部 cronjob（或 GitHub Actions schedule）每 5 分钟请求：
 
 ```bash
-curl -X POST https://your-space-url.hf.space/mcp \
-  -H "Authorization: Bearer your-mcp-token" \
-  -H "Content-Type: application/json" \
-  -d '{"method": "tools/call", "params": {"name": "search", "arguments": {"query": "What is AI?"}}}'
+curl -fsS --max-time 20 https://<your-space>.hf.space/health >/dev/null
 ```
 
-### OpenAI 兼容端点
+### 说明
 
-```bash
-curl https://your-space-url.hf.space/v1/chat/completions \
-  -H "Authorization: Bearer your-mcp-token" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "perplexity-search",
-    "messages": [{"role": "user", "content": "What is the weather today?"}],
-    "stream": false
-  }'
-```
+容器内 cron 只能在容器已运行时执行，不能保证防止 Space 冷休眠。
+外部 cron 更可靠。
 
-## 故障排除
+## 五、访问地址
 
-### 1. 服务无法启动
+- 主服务：`https://<space>.hf.space/`
+- 管理界面：`https://<space>.hf.space/admin/`
+- Playground：`https://<space>.hf.space/playground/`
+- 健康检查：`https://<space>.hf.space/health`
+- OpenAI 模型列表：`https://<space>.hf.space/v1/models`
 
-- 检查 Space 日志中的错误信息
-- 确保所有必需的 Secrets 已正确配置
-- 验证 Token 配置 JSON 格式是否正确
+## 六、常见问题
 
-### 2. 保活不工作
-
-- 检查 `/var/log/keep_alive.log` 日志
-- 确保 cron 服务正在运行
-- 验证健康检查端点是否可访问
-
-### 3. Token 过期
-
-- 定期更新 Perplexity Token
-- 使用管理界面或 API 更新 Token 配置
-
-## 注意事项
-
-1. **免费 tier 限制**: Hugging Face Spaces 免费 tier 有资源限制
-2. **休眠策略**: 免费 Space 在不活动时会休眠，保活机制可以减少休眠
-3. **数据持久性**: 本部署不使用持久卷，重启后数据会丢失
-4. **安全**: 请妥善保管您的 Token 和 API 密钥
-
-## 更新部署
-
-要更新部署：
-
-1. 修改代码并推送到 Space 仓库
-2. Hugging Face 会自动重新构建和部署
-3. 检查 Space 日志确保更新成功
-
-## 支持
-
-如有问题，请检查：
-1. Hugging Face Space 日志
-2. 应用日志 (`/var/log/keep_alive.log`)
-3. 健康检查端点状态
+1. **服务启动失败**：检查 Space Build Logs 与 Secrets JSON 格式。
+2. **匿名模式运行**：通常是 `PPLX_TOKEN_POOL_CONFIG` 未正确解析。
+3. **Token 失效**：重新抓取 Perplexity cookies 并更新 Secrets。
