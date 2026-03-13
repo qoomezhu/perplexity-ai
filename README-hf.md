@@ -1,3 +1,12 @@
+---
+title: Perplexity MCP Server
+emoji: 🔎
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+pinned: false
+---
+
 # Hugging Face Spaces 部署指南
 
 本指南用于将 Perplexity MCP Server 部署到 Hugging Face Spaces（Docker），并适配**无持久卷**场景。
