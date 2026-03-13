@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile
     container_name: perplexity-mcp
     ports:
-      - "${MCP_PORT:-8000}:8000"
+      - "${MCP_PORT:-8000}:${PORT:-8000}"
     environment:
       # MCP 认证密钥
       - MCP_TOKEN=${MCP_TOKEN:-sk-123456}
@@ -17,8 +17,11 @@ services:
       # 格式: socks5://[user[:pass]@]host[:port][#remark]
       # 示例: socks5://127.0.0.1:1080 或 socks5://user:pass@proxy.example.com:1080
       - SOCKS_PROXY=${SOCKS_PROXY:-}
+      # 端口配置
+      - PORT=${PORT:-8000}
+      # Token 池配置（可选，优先使用环境变量）
+      - PPLX_TOKEN_POOL_CONFIG=${PPLX_TOKEN_POOL_CONFIG:-/app/token_pool_config.json}
     volumes:
-      # 挂载 token 池配置文件（必需）
+      # 挂载 token 池配置文件（可选，如果使用环境变量则不需要）
       - ./token_pool_config.json:/app/token_pool_config.json
     restart: unless-stopped
-
