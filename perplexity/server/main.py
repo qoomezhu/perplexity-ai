@@ -1,9 +1,10 @@
-"""
+\"\"\"
 Main entry point for Perplexity MCP server.
 Imports all route modules to register them with the FastMCP app.
-"""
+\"\"\"
 
 import argparse
+import os
 
 # Initialize logging before importing other modules
 from ..logger import setup_logger
@@ -23,7 +24,7 @@ def run_server(
     host: str = "0.0.0.0",
     port: int = 8000,
 ) -> None:
-    """Start the MCP server with the requested transport."""
+    \"\"\"Start the MCP server with the requested transport.\"\"\"
     # Initialize the pool on startup
     get_pool()
 
@@ -42,7 +43,12 @@ def main() -> None:
         help="Transport to use for MCP server.",
     )
     parser.add_argument("--host", default="0.0.0.0", help="HTTP host (when transport=http).")
-    parser.add_argument("--port", type=int, default=8000, help="HTTP port (when transport=http).")
+    parser.add_argument(
+        "--port", 
+        type=int, 
+        default=int(os.getenv("PORT", "8000")), 
+        help="HTTP port (when transport=http)."
+    )
     args = parser.parse_args()
     run_server(transport=args.transport, host=args.host, port=args.port)
 
