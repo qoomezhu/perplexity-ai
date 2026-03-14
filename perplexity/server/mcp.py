@@ -50,7 +50,7 @@ def list_models() -> Dict[str, Any]:
 @mcp.tool
 async def search(
     query: str,
-    mode: str = "pro",
+    mode: str = "auto",
     model: Optional[str] = None,
     sources: Optional[List[str]] = None,
     language: str = "en-US",
@@ -66,8 +66,8 @@ async def search(
     Args:
         query: 搜索问题 (清晰、具体的问题效果更好)
         mode: 搜索模式
-            - 'auto': 快速模式，使用 turbo 模型，不消耗额度
-            - 'pro': 专业模式，更准确的结果 (默认)
+            - 'auto': 快速模式，使用 turbo 模型，不消耗额度 (默认)
+            - 'pro': 专业模式，更准确的结果
         model: 指定模型 (仅 pro 模式生效)
             - None: 使用默认模型 (推荐)
             - 'sonar': Perplexity 自研模型
@@ -89,7 +89,7 @@ async def search(
     """
     # 限制 search 只能使用 auto 或 pro 模式
     if mode not in ["auto", "pro"]:
-        mode = "pro"
+        mode = "auto"
     # 使用 asyncio.to_thread 避免阻塞事件循环
     return await asyncio.to_thread(
         run_query, query, mode, model, sources, language, incognito, files, fallback_to_auto
